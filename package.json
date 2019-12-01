@@ -1,0 +1,20 @@
+{
+  "name": "mini-vue",
+  "version": "1.0.0",
+  "main": "dist/mVue.umd.js",
+  "module": "dist/mVue.es.js",
+  "devDependencies": {
+    "rollup": "^1.27.2"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build:module": "rollup ./index.js -f esm -n mVue -o dist/mVue.es.js",
+    "build:main": "rollup ./index.js -f umd -n mVue -o dist/mVue.umd.js",
+    "build": "npm run build:module && npm run build:main",
+    "prepublishOnly": "npm run build"
+  },
+  "license": "MIT",
+  "author": "everywill <everywillatchina@gmail.com>"
+}

@@ -1,13 +1,19 @@
 
 
-import dirDef from './directives';
+import dirDef from './directives/index';
 
 const dirAttrReg = /^v-([^:]+)(?:$|:(.*)$)/
 
 export default function compile(el) {
   // compile html tags, return a link function
   if (el.hasChildNodes()) {
-
+    return function (vm) {
+      const nodeLink = compileNode(el);
+      const childLink = compileNodeList(el.childNodes);
+      nodeLink && nodeLink(vm);
+      childLink(vm);
+      vm._directives.forEach(d => d._bind());
+    }
   } else {
     return function (vm) {
       const nodeLink = compileNode(el);
@@ -19,6 +25,26 @@ export default function compile(el) {
 
 function compileNode(el) {
   return compileDirective(el, el.attributes);
+}
+
+function compileNodeList(nodeList) {
+  const links = [];
+  for (let i = 0; i < nodeList.length; i++) {
+    const el = nodeList[i];
+    let link = compileNode(el);
+    link && links.push(link);
+    if (el.hasChildNodes()) {
+      link = compileNodeList(el.childNodes);
+      links.push(link);
+    }
+  }
+
+  return function (vm) {
+    let i = links.length;
+    while (i--) {
+      links[i](vm);
+    }
+  }
 }
 
 function compileDirective(el, attrs) {
@@ -40,8 +66,8 @@ function compileDirective(el, attrs) {
 
     if (regResult) {
       dirName = regResult[1];
-      pushDir(dirName);
       arg = regResult[2];
+      pushDir(dirName);
     }
 
     function pushDir(dirName) {

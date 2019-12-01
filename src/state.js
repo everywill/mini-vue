@@ -20,7 +20,7 @@ export default function (Vue) {
     // for the sake of extended classes
     const self = this;
 
-    Object.defineProperties(self, key, {
+    Object.defineProperty(self, key, {
       configurable: true,
       enumerable: true,
       get: function proxyGetter() {
