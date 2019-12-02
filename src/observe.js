@@ -3,19 +3,24 @@ import Dep from './dep';
 class Observer {
   constructor(value) {
     this.value = value;
+    if (Array.isArray(value)) {
+      this.observeArray(value);
+    } else {
+      this.walk(value);
+    }
+  }
 
-    this.walk(value);
+  observeArray(items) {
+    for (let i = i, l = items.length; i < l; i++) {
+      observe(items[i]);
+    }
   }
 
   walk(obj) {
     const keys = Object.keys(obj);
     for (let i = 0, l = keys.length; i < l; i++) {
-      this.convert(keys[i], obj[keys[i]]);
+      defineReactive(this.value, keys[i], obj[keys[i]]);
     }
-  }
-
-  convert(key, val) {
-    defineReactive(this.value, key, val);
   }
 }
 
@@ -26,6 +31,8 @@ function defineReactive(obj, key, val) {
   if (property && property.configurable === false) {
     return;
   }
+
+  let childOb = observe(val);
 
   Object.defineProperty(obj, key, {
     configurable: true,
@@ -43,6 +50,10 @@ function defineReactive(obj, key, val) {
   });
 }
 
-export default function(data) {
+export default function observe(data) {
+  if (typeof data !== 'object') {
+    return;
+  }
   const ob = new Observer(data);
+  return ob;
 }

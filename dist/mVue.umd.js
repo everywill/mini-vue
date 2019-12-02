@@ -31,19 +31,24 @@
   class Observer {
     constructor(value) {
       this.value = value;
+      if (Array.isArray(value)) {
+        this.observeArray(value);
+      } else {
+        this.walk(value);
+      }
+    }
 
-      this.walk(value);
+    observeArray(items) {
+      for (let i = i, l = items.length; i < l; i++) {
+        observe(items[i]);
+      }
     }
 
     walk(obj) {
       const keys = Object.keys(obj);
       for (let i = 0, l = keys.length; i < l; i++) {
-        this.convert(keys[i], obj[keys[i]]);
+        defineReactive(this.value, keys[i], obj[keys[i]]);
       }
-    }
-
-    convert(key, val) {
-      defineReactive(this.value, key, val);
     }
   }
 
@@ -54,6 +59,8 @@
     if (property && property.configurable === false) {
       return;
     }
+
+    let childOb = observe(val);
 
     Object.defineProperty(obj, key, {
       configurable: true,
@@ -72,7 +79,11 @@
   }
 
   function observe(data) {
+    if (typeof data !== 'object') {
+      return;
+    }
     const ob = new Observer(data);
+    return ob;
   }
 
   function stateMixin (Vue) {
@@ -120,7 +131,7 @@
   var dirText = {
     update(value) {
       const el = this.descriptor.el;
-      el.innerHTML = value;
+      el.textContent = value;
     }
   };
 

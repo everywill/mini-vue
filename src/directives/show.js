@@ -1,6 +1,6 @@
 export default {
   update(value) {
     const el = this.descriptor.el;
-    el.textContent = value;
+    el.style.display = value ? '' : none;
   }
 };
