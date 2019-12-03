@@ -1,5 +1,6 @@
 import dataMixin from './data';
 import stateMixin from './state';
+import eventMixin from './event';
 import lifecycleMixin from './lifecycle';
 
 export default class Vue {
@@ -20,6 +21,8 @@ export default class Vue {
 
     // data reactivity
     this._initState();
+    this._initComputed();
+    this._initEvent();
 
     this._compile(el);
   }
@@ -27,4 +30,5 @@ export default class Vue {
 
 dataMixin(Vue);
 stateMixin(Vue);
+eventMixin(Vue);
 lifecycleMixin(Vue);

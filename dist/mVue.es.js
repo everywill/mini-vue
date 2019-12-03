@@ -1,12 +1,4 @@
-function parseExpression(exp) {
-  const reg = /^([^\[]*)(\[.*)?/;
-  const regResult = reg.exec(exp);
-  let prefix = '', suffix = '';
-  if (regResult) {
-    prefix = `.${regResult[1]}` || '';
-    suffix = regResult[2] || '';
-  }
-  
+function parseExpression(exp) {  
   return new Function('vm', 'with(vm) { return ' + exp + ';}');
 }
 
@@ -54,7 +46,7 @@ class Observer {
 
   observeArray(items) {
     for (let i = 0, l = items.length; i < l; i++) {
-      observe(items[i]);
+      defineReactive(this.value, i, items[i]);
     }
   }
 
@@ -100,6 +92,50 @@ function observe(data) {
   return ob;
 }
 
+class Watcher {
+  constructor(vm, expOfFn, cb) {
+    this.vm = vm;
+    this.cb = cb;
+    this.deps = [];
+    this.depIds = new Set();
+
+    if (typeof expOfFn === 'function') {
+      this.getter = expOfFn;
+    } else {
+      this.getter = function() {
+        return vm.$eval(expOfFn);
+      };
+    }
+
+    this.value = this.get();
+  }
+  addDep(dep) {
+    if (!this.depIds.has(dep.id)) {
+      dep.addSub(this);
+      this.deps.push(dep);
+      this.depIds.add(dep.id);
+    }
+  }
+  update() {
+    this.run();
+  }
+  run() {
+    const oldValue = this.value;
+    const value = this.get();
+    this.cb && this.cb.call(this.vm, value, oldValue);
+    this.value = value;
+  }
+  get() {
+    Dep.target = this;
+    const value = this.getter.call(this.vm);
+    Dep.target = null;
+
+    return value;
+  }
+
+  tearDown() {}
+}
+
 function stateMixin (Vue) {
   Vue.prototype._initState = function () {
     const dataFn = this.$options.data;
@@ -116,6 +152,23 @@ function stateMixin (Vue) {
     observe(data);
   };
 
+  Vue.prototype._initComputed = function () {
+    const computed = this.$options.computed;
+    if (computed) {
+      const keys = Object.keys(computed);
+      for (let i = 0, l = keys.length; i < l; i++) {
+        const userDef = computed[keys[i]];
+
+        Object.defineProperty(this, keys[i], {
+          enumerable: true,
+          configurable: true,
+          get: makeComputedGetter(userDef, this),
+          set: function() {}
+        });
+      }
+    }
+  };
+
   Vue.prototype._proxy = function (key) {
     // for the sake of extended classes
     const self = this;
@@ -130,6 +183,31 @@ function stateMixin (Vue) {
         self._data[key] = val;
       }
     });
+  };
+}
+
+function makeComputedGetter(userDef, vm) {
+  const computedWatcher = new Watcher(vm, userDef, null);
+
+  return function computedGetter() {
+    return computedWatcher.value;
+  }
+}
+
+function eventMixin (Vue) {
+  Vue.prototype._initEvent = function() {
+    const watchers = [];
+    const watch = this.$options.watch || {};
+    const keys = Object.keys(watch);
+    for (let i = 0, l = keys.length; i < l; i++) {
+      watchers.push(new Watcher(this, keys[i], watch[keys[i]]));
+    }
+
+    return function () {
+      for (let i = 0, l = watchers.length; i < l; i++) {
+        watchers[i].tearDown();
+      }
+    }
   };
 }
 
@@ -264,43 +342,6 @@ function makeNodeLinkFn(directives) {
   }
 }
 
-class Watcher {
-  constructor(vm, expOfFn, cb) {
-    this.vm = vm;
-    this.cb = cb;
-    this.deps = [];
-    this.depIds = new Set();
-
-    this.getter = function() {
-      return vm.$eval(expOfFn);
-    };
-    this.value = this.get();
-  }
-  addDep(dep) {
-    if (!this.depIds.has(dep.id)) {
-      dep.addSub(this);
-      this.deps.push(dep);
-      this.depIds.add(dep.id);
-    }
-  }
-  update() {
-    this.run();
-  }
-  run() {
-    const oldValue = this.value;
-    const value = this.get();
-    
-    this.cb.call(this.vm, value, oldValue);
-  }
-  get() {
-    Dep.target = this;
-    const value = this.getter.call(this.vm);
-    Dep.target = null;
-
-    return value;
-  }
-}
-
 function extend (to, from) {
   const keys = Object.keys(from);
   let i = keys.length;
@@ -371,6 +412,8 @@ class Vue {
 
     // data reactivity
     this._initState();
+    this._initComputed();
+    this._initEvent();
 
     this._compile(el);
   }
@@ -378,6 +421,7 @@ class Vue {
 
 dataMixin(Vue);
 stateMixin(Vue);
+eventMixin(Vue);
 lifecycleMixin(Vue);
 
 export default Vue;

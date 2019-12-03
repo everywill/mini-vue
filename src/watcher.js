@@ -7,9 +7,14 @@ export default class Watcher {
     this.deps = [];
     this.depIds = new Set();
 
-    this.getter = function() {
-      return vm.$eval(expOfFn);
+    if (typeof expOfFn === 'function') {
+      this.getter = expOfFn;
+    } else {
+      this.getter = function() {
+        return vm.$eval(expOfFn);
+      }
     }
+
     this.value = this.get();
   }
   addDep(dep) {
@@ -25,8 +30,8 @@ export default class Watcher {
   run() {
     const oldValue = this.value;
     const value = this.get();
-    
-    this.cb.call(this.vm, value, oldValue);
+    this.cb && this.cb.call(this.vm, value, oldValue);
+    this.value = value;
   }
   get() {
     Dep.target = this;
@@ -35,4 +40,6 @@ export default class Watcher {
 
     return value;
   }
+
+  tearDown() {}
 }

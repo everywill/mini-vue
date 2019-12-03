@@ -1,12 +1,4 @@
-function parseExpression(exp) {
-  const reg = /^([^\[]*)(\[.*)?/;
-  const regResult = reg.exec(exp);
-  let prefix = '', suffix = '';
-  if (regResult) {
-    prefix = `.${regResult[1]}` || '';
-    suffix = regResult[2] || '';
-  }
-  
+function parseExpression(exp) {  
   return new Function('vm', 'with(vm) { return ' + exp + ';}');
 }
 

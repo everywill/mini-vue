@@ -12,7 +12,7 @@ class Observer {
 
   observeArray(items) {
     for (let i = 0, l = items.length; i < l; i++) {
-      observe(items[i]);
+      defineReactive(this.value, i, items[i]);
     }
   }
 
