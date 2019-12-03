@@ -4,6 +4,26 @@
   (global = global || self, global.mVue = factory());
 }(this, (function () { 'use strict';
 
+  function parseExpression(exp) {
+    const reg = /^([^\[]*)(\[.*)?/;
+    const regResult = reg.exec(exp);
+    let prefix = '', suffix = '';
+    if (regResult) {
+      prefix = `.${regResult[1]}` || '';
+      suffix = regResult[2] || '';
+    }
+    
+    return new Function('vm', 'with(vm) { return ' + exp + ';}');
+  }
+
+  function dataMixin (Vue) {
+    Vue.prototype.$eval = function (exp) {
+      const res = parseExpression(exp);
+      
+      return res.call(this, this);
+    };
+  }
+
   let uid = 0;
 
   class Dep {
@@ -39,7 +59,7 @@
     }
 
     observeArray(items) {
-      for (let i = i, l = items.length; i < l; i++) {
+      for (let i = 0, l = items.length; i < l; i++) {
         observe(items[i]);
       }
     }
@@ -258,7 +278,7 @@
       this.depIds = new Set();
 
       this.getter = function() {
-        return vm[expOfFn];
+        return vm.$eval(expOfFn);
       };
       this.value = this.get();
     }
@@ -275,9 +295,8 @@
     run() {
       const oldValue = this.value;
       const value = this.get();
-      if (value !== oldValue) {
-        this.cb.call(this.vm, value, oldValue);
-      }
+      
+      this.cb.call(this.vm, value, oldValue);
     }
     get() {
       Dep.target = this;
@@ -363,6 +382,7 @@
     }
   }
 
+  dataMixin(Vue);
   stateMixin(Vue);
   lifecycleMixin(Vue);
 

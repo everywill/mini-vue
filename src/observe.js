@@ -11,7 +11,7 @@ class Observer {
   }
 
   observeArray(items) {
-    for (let i = i, l = items.length; i < l; i++) {
+    for (let i = 0, l = items.length; i < l; i++) {
       observe(items[i]);
     }
   }

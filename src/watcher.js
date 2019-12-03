@@ -8,7 +8,7 @@ export default class Watcher {
     this.depIds = new Set();
 
     this.getter = function() {
-      return vm[expOfFn];
+      return vm.$eval(expOfFn);
     }
     this.value = this.get();
   }
@@ -25,9 +25,8 @@ export default class Watcher {
   run() {
     const oldValue = this.value;
     const value = this.get();
-    if (value !== oldValue) {
-      this.cb.call(this.vm, value, oldValue);
-    }
+    
+    this.cb.call(this.vm, value, oldValue);
   }
   get() {
     Dep.target = this;

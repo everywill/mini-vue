@@ -1,3 +1,4 @@
+import dataMixin from './data';
 import stateMixin from './state';
 import lifecycleMixin from './lifecycle';
 
@@ -24,5 +25,6 @@ export default class Vue {
   }
 }
 
+dataMixin(Vue);
 stateMixin(Vue);
 lifecycleMixin(Vue);
