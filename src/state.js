@@ -1,5 +1,6 @@
 import observe from './observe';
 import Watcher from './watcher';
+import Dep from './dep';
 
 export default function (Vue) {
   Vue.prototype._initState = function () {
@@ -55,6 +56,9 @@ function makeComputedGetter(userDef, vm) {
   const computedWatcher = new Watcher(vm, userDef, null);
 
   return function computedGetter() {
+    if (Dep.target) {
+      computedWatcher.depend();
+    }
     return computedWatcher.value;
   }
 }

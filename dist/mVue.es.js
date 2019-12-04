@@ -116,6 +116,11 @@ class Watcher {
       this.depIds.add(dep.id);
     }
   }
+  depend() {
+    for(let i = 0, l = this.deps.length; i < l; i++) {
+      this.deps[i].depend();
+    }
+  }
   update() {
     this.run();
   }
@@ -190,6 +195,9 @@ function makeComputedGetter(userDef, vm) {
   const computedWatcher = new Watcher(vm, userDef, null);
 
   return function computedGetter() {
+    if (Dep.target) {
+      computedWatcher.depend();
+    }
     return computedWatcher.value;
   }
 }

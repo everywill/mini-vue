@@ -24,6 +24,11 @@ export default class Watcher {
       this.depIds.add(dep.id);
     }
   }
+  depend() {
+    for(let i = 0, l = this.deps.length; i < l; i++) {
+      this.deps[i].depend();
+    }
+  }
   update() {
     this.run();
   }
