@@ -34,10 +34,38 @@ class Dep {
 
 Dep.target = null;
 
+const proto = Array.prototype;
+const mutatorMethods = [
+  'pop',
+  'push',
+  'reverse',
+  'shift',
+  'unshift',
+  'splice',
+  'sort'
+];
+
+function modifyProto(arr) {
+  mutatorMethods.forEach(function (method) {
+    arr[method] = function (...args) {
+      proto[method].apply(this, args);
+      const ob = this.__ob__;
+      ob.dep.notify();
+    };
+  });
+}
+
 class Observer {
   constructor(value) {
     this.value = value;
+    Object.defineProperty(value, '__ob__', {
+      configurable: false,
+      enumerable: false,
+      value: this,
+    });
+    this.dep = new Dep();
     if (Array.isArray(value)) {
+      modifyProto(value);
       this.observeArray(value);
     } else {
       this.walk(value);
@@ -74,11 +102,15 @@ function defineReactive(obj, key, val) {
     get: function reactiveGetter() {
       if (Dep.target) {
         dep.depend();
+        if (childOb) {
+          childOb.dep.depend();
+        }
       }
       return val;
     },
     set: function reactiveSetter(newVal) {
       val = newVal;
+      childOb = observe(val);
       dep.notify();
     }
   });

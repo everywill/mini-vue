@@ -1,9 +1,17 @@
 import Dep from './dep';
+import modifyProto from './array';
 
 class Observer {
   constructor(value) {
     this.value = value;
+    Object.defineProperty(value, '__ob__', {
+      configurable: false,
+      enumerable: false,
+      value: this,
+    });
+    this.dep = new Dep();
     if (Array.isArray(value)) {
+      modifyProto(value);
       this.observeArray(value);
     } else {
       this.walk(value);
@@ -40,11 +48,15 @@ function defineReactive(obj, key, val) {
     get: function reactiveGetter() {
       if (Dep.target) {
         dep.depend();
+        if (childOb) {
+          childOb.dep.depend();
+        }
       }
       return val;
     },
     set: function reactiveSetter(newVal) {
       val = newVal;
+      childOb = observe(val);
       dep.notify();
     }
   });
