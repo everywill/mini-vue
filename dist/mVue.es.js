@@ -1,15 +1,3 @@
-function parseExpression(exp) {  
-  return new Function('vm', 'with(vm) { return ' + exp + ';}');
-}
-
-function dataMixin (Vue) {
-  Vue.prototype.$eval = function (exp) {
-    const res = parseExpression(exp);
-    
-    return res.call(this, this);
-  };
-}
-
 let uid = 0;
 
 class Dep {
@@ -280,45 +268,75 @@ var dirModel = {
   }
 };
 
+var component = {
+  bind() {
+    this.setComponent(this.expression);
+  },
+
+  update() {},
+
+  setComponent(id) {
+    this.Component = this.vm._resolveComponent(id);
+    this.mountComponent();
+  },
+
+  mountComponent() {
+    const newComponent = new this.Component({
+      replace: true,
+      parent: this.vm,
+      el: this.el
+    });
+  }
+};
+
 var dirDef = {
   on: dirOn,
   text: dirText,
   model: dirModel,
+  component,
 };
 
 const dirAttrReg = /^v-([^:]+)(?:$|:(.*)$)/;
 
-function compile(el) {
+function compile(el, options) {
   // compile html tags, return a link function
   if (el.hasChildNodes()) {
     return function (vm) {
-      const nodeLink = compileNode(el);
-      const childLink = compileNodeList(el.childNodes);
+      const nodeLink = compileNode(el, options);
+      const childLink = compileNodeList(el.childNodes, options);
       nodeLink && nodeLink(vm);
       childLink(vm);
       vm._directives.forEach(d => d._bind());
     }
   } else {
     return function (vm) {
-      const nodeLink = compileNode(el);
+      const nodeLink = compileNode(el, options);
       nodeLink && nodeLink(vm);
       vm._directives.forEach(d => d._bind());
     }
   }
 }
 
-function compileNode(el) {
-  return compileDirective(el, el.attributes);
+function compileNode(el, options) {
+  let linkFn;
+
+  linkFn = checkComponent(el, options);
+
+  if (!linkFn) {
+    linkFn = compileDirective(el, el.attributes);
+  }
+  
+  return linkFn;
 }
 
-function compileNodeList(nodeList) {
+function compileNodeList(nodeList, options) {
   const links = [];
   for (let i = 0; i < nodeList.length; i++) {
     const el = nodeList[i];
-    let link = compileNode(el);
+    let link = compileNode(el, options);
     link && links.push(link);
     if (el.hasChildNodes()) {
-      link = compileNodeList(el.childNodes);
+      link = compileNodeList(el.childNodes, options);
       links.push(link);
     }
   }
@@ -382,6 +400,25 @@ function makeNodeLinkFn(directives) {
   }
 }
 
+function checkComponent(el, options) {
+  const components = options.components || {};
+  const tagName = (el.tagName || '').toLowerCase();
+  if (components[tagName]) {
+    const descriptor = {
+      name: 'component',
+      def: dirDef.component,
+      expression: tagName,
+      modifier: {
+        literal: true
+      }
+    };
+
+    return function componentLinkFn (vm) {
+      vm._bindDir(descriptor, el);
+    }
+  }
+}
+
 function extend (to, from) {
   const keys = Object.keys(from);
   let i = keys.length;
@@ -394,10 +431,12 @@ function extend (to, from) {
 }
 
 class Directive {
-  constructor(descriptor, vm) {
+  constructor(descriptor, vm, el) {
     this.descriptor = descriptor;
     this.vm = vm;
+    this.el = el;
     this.expression = descriptor.expression;
+    this.literal = descriptor.modifier && descriptor.modifier.literal;
   }
   _bind() {
     const def = this.descriptor.def;
@@ -407,6 +446,12 @@ class Directive {
     if (this.bind) {
       this.bind();
     }
+
+    if (this.literal) {
+      // skip updating 
+      return;
+    }
+
     if (this.update) {
       const dir = this;
       this._update = function(val, oldVal) {
@@ -418,19 +463,65 @@ class Directive {
     
     const watcher = this._watcher = new Watcher(this.vm, this.expression, this._update);
     if (this.update) {
-      this.update(watcher.value);
+      this._update(watcher.value);
     }
   }
 }
 
+function transclude(el, options) {
+  if (options.template) {
+    return parseTemplate(options.template);
+  }
+  return el;
+}
+
+function parseTemplate(templateString) {
+  const node = document.createElement('div');
+  node.innerHTML = templateString;
+  return node.firstChild;
+}
+
 function lifecycleMixin (Vue) {
-  Vue.prototype._compile = function (el) {
-    const linkFn = compile(el);
+  Vue.prototype._compile = function (el, options) {
+    const original = el;
+    el = transclude(el, options);
+    this.$el = el;
+    const linkFn = compile(el, options);
     linkFn(this);
+
+    if (options.replace) {
+      options.parent.$el.replaceChild(el, original);
+    }
   };
 
-  Vue.prototype._bindDir = function (descriptor) {
-    this._directives.push(new Directive(descriptor, this));
+  Vue.prototype._bindDir = function (descriptor, el) {
+    this._directives.push(new Directive(descriptor, this, el));
+  };
+}
+
+function parseExpression(exp) {  
+  return new Function('vm', 'with(vm) { return ' + exp + ';}');
+}
+
+function miscMixin (Vue) {
+  Vue.prototype.$eval = function (exp) {
+    const res = parseExpression(exp);
+    
+    return res.call(this, this);
+  };
+
+  Vue.prototype._resolveComponent = function (id) {
+    const components = this.$options.components;
+    return components[id];
+  };
+
+  Vue.extend = function (extendOptions) {
+    return class extends Vue {
+      constructor(options) {
+        options = Object.assign({}, options, extendOptions);
+        super(options);
+      }
+    }
   };
 }
 
@@ -444,7 +535,10 @@ class Vue {
     
     this.$options = options;
 
-    const el = document.querySelector(options.el);
+    let el = options.el;
+    if (typeof el === 'string') {
+      el = document.querySelector(options.el);
+    }
 
     for (let k in options.methods) {
       this[k] = options.methods[k];
@@ -455,13 +549,13 @@ class Vue {
     this._initComputed();
     this._initEvent();
 
-    this._compile(el);
+    this._compile(el, options);
   }
 }
 
-dataMixin(Vue);
 stateMixin(Vue);
 eventMixin(Vue);
 lifecycleMixin(Vue);
+miscMixin(Vue);
 
 export default Vue;

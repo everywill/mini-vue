@@ -12,10 +12,12 @@ function extend (to, from) {
 }
 
 export default class Directive {
-  constructor(descriptor, vm) {
+  constructor(descriptor, vm, el) {
     this.descriptor = descriptor;
     this.vm = vm;
+    this.el = el;
     this.expression = descriptor.expression;
+    this.literal = descriptor.modifier && descriptor.modifier.literal;
   }
   _bind() {
     const def = this.descriptor.def;
@@ -25,6 +27,12 @@ export default class Directive {
     if (this.bind) {
       this.bind();
     }
+
+    if (this.literal) {
+      // skip updating 
+      return;
+    }
+
     if (this.update) {
       const dir = this;
       this._update = function(val, oldVal) {
@@ -36,7 +44,7 @@ export default class Directive {
     
     const watcher = this._watcher = new Watcher(this.vm, this.expression, this._update);
     if (this.update) {
-      this.update(watcher.value);
+      this._update(watcher.value);
     }
   }
 }

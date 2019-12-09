@@ -4,37 +4,45 @@ import dirDef from './directives/index';
 
 const dirAttrReg = /^v-([^:]+)(?:$|:(.*)$)/
 
-export default function compile(el) {
+export default function compile(el, options) {
   // compile html tags, return a link function
   if (el.hasChildNodes()) {
     return function (vm) {
-      const nodeLink = compileNode(el);
-      const childLink = compileNodeList(el.childNodes);
+      const nodeLink = compileNode(el, options);
+      const childLink = compileNodeList(el.childNodes, options);
       nodeLink && nodeLink(vm);
       childLink(vm);
       vm._directives.forEach(d => d._bind());
     }
   } else {
     return function (vm) {
-      const nodeLink = compileNode(el);
+      const nodeLink = compileNode(el, options);
       nodeLink && nodeLink(vm);
       vm._directives.forEach(d => d._bind());
     }
   }
 }
 
-function compileNode(el) {
-  return compileDirective(el, el.attributes);
+function compileNode(el, options) {
+  let linkFn;
+
+  linkFn = checkComponent(el, options);
+
+  if (!linkFn) {
+    linkFn = compileDirective(el, el.attributes);
+  }
+  
+  return linkFn;
 }
 
-function compileNodeList(nodeList) {
+function compileNodeList(nodeList, options) {
   const links = [];
   for (let i = 0; i < nodeList.length; i++) {
     const el = nodeList[i];
-    let link = compileNode(el);
+    let link = compileNode(el, options);
     link && links.push(link);
     if (el.hasChildNodes()) {
-      link = compileNodeList(el.childNodes);
+      link = compileNodeList(el.childNodes, options);
       links.push(link);
     }
   }
@@ -94,6 +102,25 @@ function makeNodeLinkFn(directives) {
     let i = directives.length;
     while (i--) {
       vm._bindDir(directives[i])
+    }
+  }
+}
+
+function checkComponent(el, options) {
+  const components = options.components || {};
+  const tagName = (el.tagName || '').toLowerCase();
+  if (components[tagName]) {
+    const descriptor = {
+      name: 'component',
+      def: dirDef.component,
+      expression: tagName,
+      modifier: {
+        literal: true
+      }
+    };
+
+    return function componentLinkFn (vm) {
+      vm._bindDir(descriptor, el);
     }
   }
 }
