@@ -1,6 +1,6 @@
-import observe from './observe';
+import observe from './observer/observe';
 import Watcher from './watcher';
-import Dep from './dep';
+import Dep from './observer/dep';
 import compileAndLinkProps from './compiler/compile-props';
 
 export default function (Vue) {

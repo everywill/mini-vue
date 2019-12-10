@@ -1,5 +1,5 @@
 import Watcher from '../watcher';
-import { defineReactive } from '../observe';
+import { defineReactive } from '../observer/observe';
  
 export default {
   bind() {
