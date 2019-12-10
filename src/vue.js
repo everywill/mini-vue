@@ -12,6 +12,7 @@ export default class Vue {
     this._directives = [];
     
     this.$options = options;
+    this._context = options.parent;
 
     let el = options.el;
     if (typeof el === 'string') {
@@ -23,6 +24,7 @@ export default class Vue {
     }
 
     // data reactivity
+    this._initProps();
     this._initState();
     this._initComputed();
     this._initEvent();

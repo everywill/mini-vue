@@ -1,6 +1,6 @@
 
 
-import dirDef from './directives/index';
+import dirDef from '../directives/index';
 
 const dirAttrReg = /^v-([^:]+)(?:$|:(.*)$)/
 

@@ -1,6 +1,6 @@
-import compile from './compile';
+import compile from './compiler/compile';
 import Directive from './directive';
-import transclude from './transclude';
+import transclude from './compiler/transclude';
 
 export default function (Vue) {
   Vue.prototype._compile = function (el, options) {

@@ -161,6 +161,119 @@ class Watcher {
   tearDown() {}
 }
 
+var dirOn = {
+  bind() {
+    const el = this.descriptor.el;
+    if (this.descriptor.arg === 'click') {
+      el.addEventListener('click', this.vm[this.descriptor.value].bind(this.vm));
+    }
+  }
+};
+
+var dirText = {
+  update(value) {
+    const el = this.descriptor.el;
+    el.textContent = value;
+  }
+};
+
+var dirModel = {
+  bind() {
+    const el = this.descriptor.el;
+    el.addEventListener('input', () => {
+      this.vm[this.expression] = el.value;
+    });
+  },
+  update(value) {
+    const el = this.descriptor.el;
+    el.value = value;
+  }
+};
+
+var component = {
+  bind() {
+    this.setComponent(this.expression);
+  },
+
+  update() {},
+
+  setComponent(id) {
+    this.Component = this.vm._resolveComponent(id);
+    this.mountComponent();
+  },
+
+  mountComponent() {
+    const newComponent = new this.Component({
+      replace: true,
+      parent: this.vm,
+      el: this.el
+    });
+  }
+};
+
+var prop = {
+  bind() {
+    const child = this.vm;
+    const parent = child._context;
+    const childKey = this.descriptor.prop.name;
+    const parentKey = this.descriptor.prop.path;
+
+    const parentWatcher = this.parentWatcher = new Watcher(
+      parent,
+      parentKey,
+      function (val) {
+        child[childKey] = val;
+      }
+    );
+
+    defineReactive(child, childKey, parentWatcher.value);
+  }
+};
+
+var dirDef = {
+  on: dirOn,
+  text: dirText,
+  model: dirModel,
+  component,
+  prop,
+};
+
+function compileAndLinkProps(vm, el, props) {
+  const propsLinkFn = compileProps(el, props);
+  propsLinkFn && propsLinkFn(vm);
+}
+
+function compileProps(el, optionProps, vm) {
+  const props = [];
+  const names = optionProps;
+  let i = names.length;
+  let name, path;
+  while(i--) {
+    name = names[i];
+    path = el.getAttribute(`:${name}`);
+    props.push({
+      name,
+      path
+    });
+  }
+  return makePropsLinkFn(props);
+}
+
+function makePropsLinkFn(props) {
+  return function propsLinkFn (vm) {
+    let i = props.length;
+    let prop;
+    while(i--) {
+      prop = props[i];
+      vm._bindDir({
+        name: 'prop',
+        def: dirDef.prop,
+        prop,
+      });
+    }
+  }
+}
+
 function stateMixin (Vue) {
   Vue.prototype._initState = function () {
     const dataFn = this.$options.data;
@@ -175,6 +288,13 @@ function stateMixin (Vue) {
     }
 
     observe(data);
+  };
+
+  Vue.prototype._initProps = function () {
+    const { props, el } = this.$options;
+    if (props) {
+      compileAndLinkProps(this, el, props);
+    }
   };
 
   Vue.prototype._initComputed = function () {
@@ -238,63 +358,6 @@ function eventMixin (Vue) {
     }
   };
 }
-
-var dirOn = {
-  bind() {
-    const el = this.descriptor.el;
-    if (this.descriptor.arg === 'click') {
-      el.addEventListener('click', this.vm[this.descriptor.value].bind(this.vm));
-    }
-  }
-};
-
-var dirText = {
-  update(value) {
-    const el = this.descriptor.el;
-    el.textContent = value;
-  }
-};
-
-var dirModel = {
-  bind() {
-    const el = this.descriptor.el;
-    el.addEventListener('input', () => {
-      this.vm[this.expression] = el.value;
-    });
-  },
-  update(value) {
-    const el = this.descriptor.el;
-    el.value = value;
-  }
-};
-
-var component = {
-  bind() {
-    this.setComponent(this.expression);
-  },
-
-  update() {},
-
-  setComponent(id) {
-    this.Component = this.vm._resolveComponent(id);
-    this.mountComponent();
-  },
-
-  mountComponent() {
-    const newComponent = new this.Component({
-      replace: true,
-      parent: this.vm,
-      el: this.el
-    });
-  }
-};
-
-var dirDef = {
-  on: dirOn,
-  text: dirText,
-  model: dirModel,
-  component,
-};
 
 const dirAttrReg = /^v-([^:]+)(?:$|:(.*)$)/;
 
@@ -534,6 +597,7 @@ class Vue {
     this._directives = [];
     
     this.$options = options;
+    this._context = options.parent;
 
     let el = options.el;
     if (typeof el === 'string') {
@@ -545,6 +609,7 @@ class Vue {
     }
 
     // data reactivity
+    this._initProps();
     this._initState();
     this._initComputed();
     this._initEvent();

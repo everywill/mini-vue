@@ -32,7 +32,7 @@ class Observer {
   }
 }
 
-function defineReactive(obj, key, val) {
+export function defineReactive(obj, key, val) {
   const dep = new Dep();
 
   const property = Object.getOwnPropertyDescriptor(obj, key);
