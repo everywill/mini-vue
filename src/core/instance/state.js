@@ -1,7 +1,6 @@
-import observe from './observer/observe';
-import Watcher from './watcher';
-import Dep from './observer/dep';
-import compileAndLinkProps from './compiler/compile-props';
+import observe from '../observer/observe';
+import Watcher from '../observer/watcher';
+import Dep from '../observer/dep';
 
 export default function (Vue) {
   Vue.prototype._initState = function () {
@@ -17,13 +16,6 @@ export default function (Vue) {
     }
 
     observe(data);
-  }
-
-  Vue.prototype._initProps = function () {
-    const { props, el } = this.$options;
-    if (props) {
-      compileAndLinkProps(this, el, props);
-    }
   }
 
   Vue.prototype._initComputed = function () {
