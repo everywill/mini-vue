@@ -1,3 +1,3 @@
-import Vue from './src/vue';
+import Vue from './src/platforms/web/index';
 
 export default Vue;
