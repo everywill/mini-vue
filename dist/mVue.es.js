@@ -161,120 +161,11 @@ class Watcher {
   tearDown() {}
 }
 
-var dirOn = {
-  bind() {
-    const el = this.descriptor.el;
-    if (this.descriptor.arg === 'click') {
-      el.addEventListener('click', this.vm[this.descriptor.value].bind(this.vm));
-    }
-  }
-};
-
-var dirText = {
-  update(value) {
-    const el = this.descriptor.el;
-    el.textContent = value;
-  }
-};
-
-var dirModel = {
-  bind() {
-    const el = this.descriptor.el;
-    el.addEventListener('input', () => {
-      this.vm[this.expression] = el.value;
-    });
-  },
-  update(value) {
-    const el = this.descriptor.el;
-    el.value = value;
-  }
-};
-
-var component = {
-  bind() {
-    this.setComponent(this.expression);
-  },
-
-  update() {},
-
-  setComponent(id) {
-    this.Component = this.vm._resolveComponent(id);
-    this.mountComponent();
-  },
-
-  mountComponent() {
-    const newComponent = new this.Component({
-      replace: true,
-      parent: this.vm,
-      el: this.el
-    });
-  }
-};
-
-var prop = {
-  bind() {
-    const child = this.vm;
-    const parent = child._context;
-    const childKey = this.descriptor.prop.name;
-    const parentKey = this.descriptor.prop.path;
-
-    const parentWatcher = this.parentWatcher = new Watcher(
-      parent,
-      parentKey,
-      function (val) {
-        child[childKey] = val;
-      }
-    );
-
-    defineReactive(child, childKey, parentWatcher.value);
-  }
-};
-
-var dirDef = {
-  on: dirOn,
-  text: dirText,
-  model: dirModel,
-  component,
-  prop,
-};
-
-function compileAndLinkProps(vm, el, props) {
-  const propsLinkFn = compileProps(el, props);
-  propsLinkFn && propsLinkFn(vm);
-}
-
-function compileProps(el, optionProps, vm) {
-  const props = [];
-  const names = optionProps;
-  let i = names.length;
-  let name, path;
-  while(i--) {
-    name = names[i];
-    path = el.getAttribute(`:${name}`);
-    props.push({
-      name,
-      path
-    });
-  }
-  return makePropsLinkFn(props);
-}
-
-function makePropsLinkFn(props) {
-  return function propsLinkFn (vm) {
-    let i = props.length;
-    let prop;
-    while(i--) {
-      prop = props[i];
-      vm._bindDir({
-        name: 'prop',
-        def: dirDef.prop,
-        prop,
-      });
-    }
-  }
-}
-
 function stateMixin (Vue) {
+  Vue.prototype._initProps = function () {
+    
+  };
+
   Vue.prototype._initState = function () {
     const dataFn = this.$options.data;
     const data = this._data = dataFn ? (typeof dataFn === 'function' ? dataFn() : dataFn) : {};
@@ -288,13 +179,6 @@ function stateMixin (Vue) {
     }
 
     observe(data);
-  };
-
-  Vue.prototype._initProps = function () {
-    const { props, el } = this.$options;
-    if (props) {
-      compileAndLinkProps(this, el, props);
-    }
   };
 
   Vue.prototype._initComputed = function () {
@@ -359,207 +243,8 @@ function eventMixin (Vue) {
   };
 }
 
-const dirAttrReg = /^v-([^:]+)(?:$|:(.*)$)/;
-
-function compile(el, options) {
-  // compile html tags, return a link function
-  if (el.hasChildNodes()) {
-    return function (vm) {
-      const nodeLink = compileNode(el, options);
-      const childLink = compileNodeList(el.childNodes, options);
-      nodeLink && nodeLink(vm);
-      childLink(vm);
-      vm._directives.forEach(d => d._bind());
-    }
-  } else {
-    return function (vm) {
-      const nodeLink = compileNode(el, options);
-      nodeLink && nodeLink(vm);
-      vm._directives.forEach(d => d._bind());
-    }
-  }
-}
-
-function compileNode(el, options) {
-  let linkFn;
-
-  linkFn = checkComponent(el, options);
-
-  if (!linkFn) {
-    linkFn = compileDirective(el, el.attributes);
-  }
-  
-  return linkFn;
-}
-
-function compileNodeList(nodeList, options) {
-  const links = [];
-  for (let i = 0; i < nodeList.length; i++) {
-    const el = nodeList[i];
-    let link = compileNode(el, options);
-    link && links.push(link);
-    if (el.hasChildNodes()) {
-      link = compileNodeList(el.childNodes, options);
-      links.push(link);
-    }
-  }
-
-  return function (vm) {
-    let i = links.length;
-    while (i--) {
-      links[i](vm);
-    }
-  }
-}
-
-function compileDirective(el, attrs) {
-  if (!attrs) {
-    return undefined;
-  }
-  const dirs = [];
-  let i = attrs.length;
-
-  while(i--) {
-    const attr = attrs[i];
-    const rawName = attr.name;
-    const name = rawName.replace(/^@/, 'v-on:');
-    const value = attr.value;
-    let dirName;
-    let arg;
-    
-    const regResult = dirAttrReg.exec(name);
-
-    if (regResult) {
-      dirName = regResult[1];
-      arg = regResult[2];
-      pushDir(dirName);
-    }
-
-    function pushDir(dirName) {
-      dirs.push({
-        el,
-        def: dirDef[dirName],
-        name: dirName,
-        rawName,
-        arg,
-        value,
-        rawValue: value,
-        expression: value
-      });
-    }
-  }
-
-  if (dirs.length) {
-    return makeNodeLinkFn(dirs);
-  }
-}
-
-function makeNodeLinkFn(directives) {
-  return function nodeLinkFn (vm) {
-    let i = directives.length;
-    while (i--) {
-      vm._bindDir(directives[i]);
-    }
-  }
-}
-
-function checkComponent(el, options) {
-  const components = options.components || {};
-  const tagName = (el.tagName || '').toLowerCase();
-  if (components[tagName]) {
-    const descriptor = {
-      name: 'component',
-      def: dirDef.component,
-      expression: tagName,
-      modifier: {
-        literal: true
-      }
-    };
-
-    return function componentLinkFn (vm) {
-      vm._bindDir(descriptor, el);
-    }
-  }
-}
-
-function extend (to, from) {
-  const keys = Object.keys(from);
-  let i = keys.length;
-
-  while (i--) {
-    to[keys[i]] = from[keys[i]];
-  }
-
-  return to;
-}
-
-class Directive {
-  constructor(descriptor, vm, el) {
-    this.descriptor = descriptor;
-    this.vm = vm;
-    this.el = el;
-    this.expression = descriptor.expression;
-    this.literal = descriptor.modifier && descriptor.modifier.literal;
-  }
-  _bind() {
-    const def = this.descriptor.def;
-
-    extend(this, def);
-
-    if (this.bind) {
-      this.bind();
-    }
-
-    if (this.literal) {
-      // skip updating 
-      return;
-    }
-
-    if (this.update) {
-      const dir = this;
-      this._update = function(val, oldVal) {
-        dir.update(val, oldVal);
-      };
-    } else {
-      this._update = function() {};
-    }
-    
-    const watcher = this._watcher = new Watcher(this.vm, this.expression, this._update);
-    if (this.update) {
-      this._update(watcher.value);
-    }
-  }
-}
-
-function transclude(el, options) {
-  if (options.template) {
-    return parseTemplate(options.template);
-  }
-  return el;
-}
-
-function parseTemplate(templateString) {
-  const node = document.createElement('div');
-  node.innerHTML = templateString;
-  return node.firstChild;
-}
-
 function lifecycleMixin (Vue) {
-  Vue.prototype._compile = function (el, options) {
-    const original = el;
-    el = transclude(el, options);
-    this.$el = el;
-    const linkFn = compile(el, options);
-    linkFn(this);
-
-    if (options.replace) {
-      options.parent.$el.replaceChild(el, original);
-    }
-  };
-
-  Vue.prototype._bindDir = function (descriptor, el) {
-    this._directives.push(new Directive(descriptor, this, el));
-  };
+  Vue.prototype._update = function (vnode) {};
 }
 
 function parseExpression(exp) {  
@@ -594,15 +279,7 @@ class Vue {
   }
 
   init(options) {
-    this._directives = [];
-    
     this.$options = options;
-    this._context = options.parent;
-
-    let el = options.el;
-    if (typeof el === 'string') {
-      el = document.querySelector(options.el);
-    }
 
     for (let k in options.methods) {
       this[k] = options.methods[k];
@@ -614,7 +291,9 @@ class Vue {
     this._initComputed();
     this._initEvent();
 
-    this._compile(el, options);
+    if (options.el) {
+      this.$mount(options.el);
+    }
   }
 }
 
@@ -622,5 +301,113 @@ stateMixin(Vue);
 eventMixin(Vue);
 lifecycleMixin(Vue);
 miscMixin(Vue);
+
+const attrReg = /\s([^'"/\s><]+?)[\s/>]|([^\s=]+)=\s?(".*?"|'.*?')/g;
+
+function tagParser(tag) {
+  const result = {
+    type: 'tag',
+    name: '',
+    attrs: {},
+    children: []
+  };
+
+  const tagMatch = tag.match(/<\/?([^\s]+?)[/\s>]/);
+
+  if (tagMatch) {
+    result.name = tagMatch[1];
+  }
+
+  let attrRegResult;
+  while(true) {
+    attrRegResult = attrReg.exec(tag);
+
+    if (!attrRegResult) {
+      break;
+    }
+
+    if (attrRegResult[1]) {
+      let attr = attrRegResult[1].trim();
+      result.attrs[attr] = true;
+    }
+
+    if (attrRegResult[2]) {
+      let attr = attrRegResult[2].trim();
+      let value = attrRegResult[3].trim().substring(1, attrRegResult[3].length - 1);
+      result.attrs[attr] = value;
+    }
+  }
+
+  return result;
+}
+
+const domParserTokenizer = /<[a-zA-Z\-\!\/](?:"[^"]*"['"]*|'[^']*'['"]*|[^'">])*>/gm;
+
+function parse(htmlString, options = {}) {
+  const registeredComp = options.components || {};
+  const result = [];
+  const levelParent = [];
+  let level = -1;
+  let current;
+
+  htmlString.replace(domParserTokenizer, function (tag, index) {
+    // tag example: </div>
+    const isClose = tag.charAt(1) === '/'; 
+    const contentStart = index + tag.length;
+    const nextChar = htmlString.charAt(contentStart);
+    
+    if (isClose) {
+      level --;
+    } else {
+      level ++;
+      current = tagParser(tag);
+
+      if (nextChar && nextChar !== '<') {
+        current.children.push({
+          type: 'text',
+          content: htmlString.slice(contentStart, htmlString.indexOf('<', contentStart))
+        });
+      }
+
+      if (level === 0) {
+        result.push(current);
+      }
+
+      const parent = levelParent[level - 1];
+      if (parent) {
+        parent.children.push(current);
+      }
+
+      levelParent[level] = current;
+    }
+
+  });
+  
+  return result;
+}
+
+function compileToFunctions (htmlString) {
+  console.log(parse(htmlString));
+}
+
+Vue.prototype.$mount = function (el) {
+  if (typeof el === 'string') {
+    el = document.querySelector(el);
+  }
+
+  const options = this.$options;
+  if (!options.render) {
+    let template = options.template;
+    // only take into account the situation template is kind of html string
+    if (!template) {
+      template = el.outerHTML;
+    }
+
+    compileToFunctions(template);
+  }
+
+
+  // return mountComponent(el);
+};
 
 export default Vue;

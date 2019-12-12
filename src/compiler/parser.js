@@ -7,7 +7,7 @@ export default function parse(htmlString, options = {}) {
   const result = [];
   const levelParent = [];
   let level = -1;
-
+  let current;
 
   htmlString.replace(domParserTokenizer, function (tag, index) {
     // tag example: </div>

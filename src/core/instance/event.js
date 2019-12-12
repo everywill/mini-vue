@@ -1,4 +1,4 @@
-import Watcher from './watcher';
+import Watcher from '../observer/watcher';
 
 export default function (Vue) {
   Vue.prototype._initEvent = function() {

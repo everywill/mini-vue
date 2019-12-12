@@ -29,7 +29,7 @@ export default function tagParser(tag) {
 
     if (attrRegResult[2]) {
       let attr = attrRegResult[2].trim();
-      let value = attrRegResult[3].trim();
+      let value = attrRegResult[3].trim().substring(1, attrRegResult[3].length - 1);
       result.attrs[attr] = value;
     }
   }

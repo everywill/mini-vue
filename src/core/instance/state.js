@@ -3,6 +3,10 @@ import Watcher from '../observer/watcher';
 import Dep from '../observer/dep';
 
 export default function (Vue) {
+  Vue.prototype._initProps = function () {
+    
+  }
+
   Vue.prototype._initState = function () {
     const dataFn = this.$options.data;
     const data = this._data = dataFn ? (typeof dataFn === 'function' ? dataFn() : dataFn) : {};

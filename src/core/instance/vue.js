@@ -1,7 +1,9 @@
 import stateMixin from './state';
 import eventMixin from './event';
 import lifecycleMixin from './lifecycle';
+import renderMixin from './render';
 import miscMixin from './misc';
+import render from './render';
 
 export default class Vue {
   constructor(options) {
@@ -10,12 +12,6 @@ export default class Vue {
 
   init(options) {
     this.$options = options;
-    this._context = options.parent;
-
-    let el = options.el;
-    if (typeof el === 'string') {
-      el = document.querySelector(options.el)
-    }
 
     for (let k in options.methods) {
       this[k] = options.methods[k];
@@ -27,7 +23,9 @@ export default class Vue {
     this._initComputed();
     this._initEvent();
 
-    this._compile(el, options);
+    if (options.el) {
+      this.$mount(options.el);
+    }
   }
 }
 
@@ -35,3 +33,4 @@ stateMixin(Vue);
 eventMixin(Vue);
 lifecycleMixin(Vue);
 miscMixin(Vue);
+renderMixin(Vue);
