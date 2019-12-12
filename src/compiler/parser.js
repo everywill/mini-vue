@@ -24,7 +24,7 @@ export default function parse(htmlString, options = {}) {
       if (nextChar && nextChar !== '<') {
         current.children.push({
           type: 'text',
-          content: htmlString.slice(contentStart, htmlString.indexOf('<', contentStart))
+          content: htmlString.slice(contentStart, htmlString.indexOf('<', contentStart)).trim(),
         })
       }
 

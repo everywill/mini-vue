@@ -244,7 +244,52 @@ function eventMixin (Vue) {
 }
 
 function lifecycleMixin (Vue) {
-  Vue.prototype._update = function (vnode) {};
+  Vue.prototype._update = function (vnode) {
+    const prevVnode = this._vnode;
+    this._vnode = prevVnode;
+    
+    this.__patch__(prevVnode, vnode);
+  };
+}
+
+function mountComponent(vm, el) {
+  const updateComponent = () => {
+    vm._update(vm._render());
+  };
+
+  new Watcher(vm, updateComponent);
+
+  return vm;
+}
+
+const TEXT_ELEMENT = 'TEXT ELEMENT';
+
+function createElement(type, config, ...args) {
+  const props = Object.assign({}, config);
+  const hasChildren = args.length > 0;
+  const rawChildren = hasChildren ? [].concat(...args) : [];
+  props.children = rawChildren;
+
+  return { type, props };
+}
+
+function createTextElement(value) {
+  return createElement(TEXT_ELEMENT, { textContent: value });
+}
+
+function renderMixin (Vue) {
+  Vue.prototype._c = createElement;
+
+  Vue.prototype._v = createTextElement;
+
+  Vue.prototype._s = JSON.stringify.bind(JSON);
+
+  Vue.prototype._render = function () {
+    const { render } = this.$options;
+    const vnode = render.call(this);
+
+    return vnode;
+  };
 }
 
 function parseExpression(exp) {  
@@ -301,6 +346,7 @@ stateMixin(Vue);
 eventMixin(Vue);
 lifecycleMixin(Vue);
 miscMixin(Vue);
+renderMixin(Vue);
 
 const attrReg = /\s([^'"/\s><]+?)[\s/>]|([^\s=]+)=\s?(".*?"|'.*?')/g;
 
@@ -365,7 +411,7 @@ function parse(htmlString, options = {}) {
       if (nextChar && nextChar !== '<') {
         current.children.push({
           type: 'text',
-          content: htmlString.slice(contentStart, htmlString.indexOf('<', contentStart))
+          content: htmlString.slice(contentStart, htmlString.indexOf('<', contentStart)).trim(),
         });
       }
 
@@ -386,9 +432,97 @@ function parse(htmlString, options = {}) {
   return result;
 }
 
-function compileToFunctions (htmlString) {
-  console.log(parse(htmlString));
+function genCode(element) {
+  return new Function(`with(this) {return ${genElement(element)}}`);
 }
+
+function genElement(element) {
+  if (element.type === 'tag') {
+    return `_c('${genType(element)}', {${genConfig(element)}}, [${genChildren(element)}])`;
+  } else if (element.type === 'text') {
+    return `_v('${element.content}')`;
+  }
+  
+}
+
+function genType(element) {
+  return element.name;
+}
+
+function genConfig(element) {
+  const dirAttrReg = /^v-([^:]+)(?:$|:(.*)$)/;
+  const rawAttrs = element.attrs;
+  const names = Object.keys(rawAttrs);
+  const attrs = [];
+  const domProps = [];
+  const ons = [];
+  const result = [];
+
+  for (let i = 0, l = names.length; i < l; i++) {
+    let name = names[i];
+    let value = rawAttrs[name];
+    
+    const regResult = dirAttrReg.exec(name);
+
+    if (regResult) {
+      if (regResult[1] === 'on') {
+        ons.push({
+          name: `${regResult[2]}`,
+          value,
+        });
+      }
+      if (regResult[1] === 'text') {
+        domProps.push({
+          name: 'textContent',
+          value: `_s(${value})`,
+        });
+      }
+    } else {
+      attrs.push({
+        name,
+        value: `'${value}'`,
+      });
+    }
+  }
+
+  if (attrs.length) {
+    result.push(`attrs:{${attrs.map(attr => attr.name + ':' + attr.value).join(',')}}`);
+  }
+
+  if (domProps.length) {
+    result.push(`domProps:{${domProps.map(domProp => domProp.name + ':' + domProp.value).join(',')}}`);
+  }
+
+  if (ons.length) {
+    result.push(`on:{${ons.map(on => on.name + ':' + on.value).join(',')}}`);
+  }
+
+  return result.join(',');
+}
+
+function genChildren(element) {
+  const children = element.children;
+  return children.map(child => genElement(child)).join(',');
+}
+
+function compileToFunction (htmlString) {
+  const elements = parse(htmlString);
+  return genCode(elements[0]);
+}
+
+function createPatch ({nodeOps}) {
+  return function patch (oldVnode, vnode) {
+    
+  };
+}
+
+var nodeOps = {
+  
+};
+
+const patch = createPatch({nodeOps});
+
+Vue.prototype.__patch__ = patch;
 
 Vue.prototype.$mount = function (el) {
   if (typeof el === 'string') {
@@ -403,11 +537,10 @@ Vue.prototype.$mount = function (el) {
       template = el.outerHTML;
     }
 
-    compileToFunctions(template);
+    options.render = compileToFunction(template);
   }
 
-
-  // return mountComponent(el);
+  return mountComponent(this);
 };
 
 export default Vue;

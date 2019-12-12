@@ -1,7 +1,12 @@
 import Watcher from '../observer/watcher';
 
 export default function (Vue) {
-  Vue.prototype._update = function (vnode) {}
+  Vue.prototype._update = function (vnode) {
+    const prevVnode = this._vnode;
+    this._vnode = prevVnode;
+    
+    this.__patch__(prevVnode, vnode);
+  }
 }
 
 export function mountComponent(vm, el) {

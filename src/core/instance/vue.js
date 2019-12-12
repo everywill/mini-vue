@@ -3,7 +3,6 @@ import eventMixin from './event';
 import lifecycleMixin from './lifecycle';
 import renderMixin from './render';
 import miscMixin from './misc';
-import render from './render';
 
 export default class Vue {
   constructor(options) {

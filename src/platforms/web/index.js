@@ -1,6 +1,9 @@
 import Vue from '../../core/instance/vue';
 import { compileToFunction } from '../../compiler/index';
 import { mountComponent } from '../../core/instance/lifecycle';
+import { patch } from './patch';
+
+Vue.prototype.__patch__ = patch;
 
 Vue.prototype.$mount = function (el) {
   if (typeof el === 'string') {
