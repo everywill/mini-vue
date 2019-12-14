@@ -4,8 +4,12 @@ export default function (Vue) {
   Vue.prototype._update = function (vnode) {
     const prevVnode = this._vnode;
     this._vnode = prevVnode;
+    if (prevVnode) {
+      this.__patch__(prevVnode, vnode);
+    } else {
+      this.__patch__(this.$el, vnode);
+    }
     
-    this.__patch__(prevVnode, vnode);
   }
 }
 

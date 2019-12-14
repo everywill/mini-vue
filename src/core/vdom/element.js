@@ -6,7 +6,7 @@ export function createElement(type, config, ...args) {
   const rawChildren = hasChildren ? [].concat(...args) : [];
   data.children = rawChildren;
 
-  return { type, data };
+  return { type, data, context: this };
 }
 
 export function createTextElement(value) {

@@ -10,6 +10,8 @@ Vue.prototype.$mount = function (el) {
     el = document.querySelector(el);
   }
 
+  this.$el = el;
+
   const options = this.$options;
   if (!options.render) {
     let template = options.template;
@@ -21,7 +23,7 @@ Vue.prototype.$mount = function (el) {
     options.render = compileToFunction(template);
   }
 
-  return mountComponent(this, el);
+  return mountComponent(this, this.$el);
 }
 
 export default Vue;

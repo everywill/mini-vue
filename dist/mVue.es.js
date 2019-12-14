@@ -247,8 +247,12 @@ function lifecycleMixin (Vue) {
   Vue.prototype._update = function (vnode) {
     const prevVnode = this._vnode;
     this._vnode = prevVnode;
+    if (prevVnode) {
+      this.__patch__(prevVnode, vnode);
+    } else {
+      this.__patch__(this.$el, vnode);
+    }
     
-    this.__patch__(prevVnode, vnode);
   };
 }
 
@@ -265,16 +269,16 @@ function mountComponent(vm, el) {
 const TEXT_ELEMENT = 'TEXT ELEMENT';
 
 function createElement(type, config, ...args) {
-  const props = Object.assign({}, config);
+  const data = Object.assign({}, config);
   const hasChildren = args.length > 0;
   const rawChildren = hasChildren ? [].concat(...args) : [];
-  props.children = rawChildren;
+  data.children = rawChildren;
 
-  return { type, props };
+  return { type, data, context: this };
 }
 
 function createTextElement(value) {
-  return createElement(TEXT_ELEMENT, { textContent: value });
+  return createElement(TEXT_ELEMENT, { value });
 }
 
 function renderMixin (Vue) {
@@ -510,17 +514,183 @@ function compileToFunction (htmlString) {
   return genCode(elements[0]);
 }
 
-function createPatch ({nodeOps}) {
+const hooks = ['create', 'update'];
+
+function createPatch ({nodeOps, modules}) {
+  const cbs = {};
+
+  for (let i = 0, l = hooks.length; i < l; i++) {
+    let hoolCb = cbs[hooks[i]] = [];
+    for (let j = 0, k = modules.length; j < k; j++) {
+      const moduleHook = modules[j][hooks[i]];
+      if (moduleHook) {
+        hoolCb.push(moduleHook);
+      }
+    }
+  }
+
+  function createElm(vnode, parentElm, refElm) {
+    const { type, data } = vnode;
+    if (type === TEXT_ELEMENT) {
+      vnode.elm = nodeOps.createTextNode(data.value);
+      insert(parentElm, vnode.elm, refElm);
+    } else {
+      const { children } = data;
+      vnode.elm = nodeOps.createElement(type);
+      createChildren(vnode, children);
+      invokeCreateHooks(vnode);    
+      insert(parentElm, vnode.elm, refElm);
+    }
+  }
+
+  function createChildren(vnode, children) {
+    for (let i = 0, l = children.length; i < l; i++) {
+      createElm(children[i], vnode.elm);
+    }
+  }
+
+  function invokeCreateHooks(vnode) {
+    for (let i =0, l = cbs.create.length; i < l; i++) {
+      cbs.create[i]({}, vnode);
+    }
+  }
+
+  function insert(parent, elm, refElm) {
+    if (refElm) {
+      nodeOps.insertBefore(parent, elm, refElm);
+    } else {
+      nodeOps.appendChild(parent, elm);
+    }
+  }
+
   return function patch (oldVnode, vnode) {
-    
+    const isRealElement = !!oldVnode.nodeType;
+    if (isRealElement) {
+      const parentElm = nodeOps.parentNode(oldVnode);
+      createElm(vnode, parentElm, nodeOps.nextSibling(oldVnode));
+    }
   };
 }
 
-var nodeOps = {
-  
+function createElement$1(tagName) {
+  return document.createElement(tagName);
+}
+function createTextNode(content) {
+  return document.createTextNode(content);
+}
+function parentNode(node) {
+  return node.parentNode;
+}
+function nextSibling(node) {
+  return node.nextSibling;
+}
+function tagName(node) {
+  return node.tagName;
+}
+
+function removeChild(parent, child) {
+  parent.removeChild(child);
+}
+function appendChild(parent, child) {
+  parent.appendChild(child);
+}
+function insertBefore(parent, child, refChild) {
+  parent.insertBefore(child, refChild);
+}
+
+var nodeOps = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  createElement: createElement$1,
+  createTextNode: createTextNode,
+  parentNode: parentNode,
+  nextSibling: nextSibling,
+  tagName: tagName,
+  removeChild: removeChild,
+  appendChild: appendChild,
+  insertBefore: insertBefore
+});
+
+var baseModules = [];
+
+var events = {
+  create: updateDomListener,
+  update: updateDomListener,
 };
 
-const patch = createPatch({nodeOps});
+let _target;
+
+function updateDomListener(oldVnode, vnode) {
+  const elm = vnode.elm;
+  const { children: oldChildren, ...oldAttrs } = oldVnode.data || {};
+  const { children, ...attrs } = vnode.data;
+  const ons = attrs.on || {};
+  const oldOns = oldAttrs.on || {};
+  let cur, old;
+
+  _target = vnode.elm;
+
+  for(let name in ons) {
+    cur = ons[name];
+    old = oldOns[name];
+
+    if (!old) {
+      cur = ons[name] = createFnInvoker(cur, vnode.context);
+      _target.addEventListener(name, cur);
+    } else if (cur !== old) {
+      old.fn = cur;
+      cur[name] = old;
+    }
+  }
+
+  for(let name in oldOns) {
+    if (!ons[name]) {
+      _target.removeEventListener(name, oldOns[name]);
+    }
+  }
+
+  _target = undefined;
+}
+
+function createFnInvoker(fn, vm) {
+  function invoker(...args) {
+    return fn.apply(vm, ...args);
+  }
+
+  invoker.fn = fn;
+  return invoker;
+}
+
+var domProps = {
+  create: updateDomProps,
+  update: updateDomProps,
+};
+
+function updateDomProps(oldVnode, vnode) {
+  const elm = vnode.elm;
+  const { children: oldChildren, ...oldAttrs } = oldVnode.data || {};
+  const { children, ...attrs } = vnode.data;
+  const domProps = attrs.domProps || {};
+  const oldDomProps = oldAttrs.domProps || {};
+
+  for (let key in oldDomProps) {
+    if (domProps.hasOwnProperty(key)) {
+      elm[key] = null;
+    }
+  }
+
+  for (let key in domProps) {
+    elm[key] = domProps[key];
+  }
+}
+
+var platformModules = [
+  events,
+  domProps,
+];
+
+const modules = baseModules.concat(platformModules);
+
+const patch = createPatch({nodeOps, modules});
 
 Vue.prototype.__patch__ = patch;
 
@@ -528,6 +698,8 @@ Vue.prototype.$mount = function (el) {
   if (typeof el === 'string') {
     el = document.querySelector(el);
   }
+
+  this.$el = el;
 
   const options = this.$options;
   if (!options.render) {
@@ -540,7 +712,7 @@ Vue.prototype.$mount = function (el) {
     options.render = compileToFunction(template);
   }
 
-  return mountComponent(this);
+  return mountComponent(this, this.$el);
 };
 
 export default Vue;

@@ -1,7 +1,7 @@
 import createPatch from '../../core/vdom/patch';
 import * as nodeOps from './runtime/node-ops';
-import baseModules from '../../core/vdom/modules';
-import platformModules from './runtime/modules';
+import baseModules from '../../core/vdom/modules/index';
+import platformModules from './runtime/modules/index';
 
 const modules = baseModules.concat(platformModules);
 
