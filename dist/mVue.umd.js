@@ -252,7 +252,7 @@
   function lifecycleMixin (Vue) {
     Vue.prototype._update = function (vnode) {
       const prevVnode = this._vnode;
-      this._vnode = prevVnode;
+      this._vnode = vnode;
       if (prevVnode) {
         this.__patch__(prevVnode, vnode);
       } else {
@@ -556,8 +556,14 @@
     }
 
     function invokeCreateHooks(vnode) {
-      for (let i =0, l = cbs.create.length; i < l; i++) {
+      for (let i = 0, l = cbs.create.length; i < l; i++) {
         cbs.create[i]({}, vnode);
+      }
+    }
+
+    function invokeUpdateHooks(oldVnode, vnode) {
+      for (let i = 0, l = cbs.update.length; i < l; i++) {
+        cbs.update[i](oldVnode, vnode);
       }
     }
 
@@ -569,11 +575,50 @@
       }
     }
 
-    return function patch (oldVnode, vnode) {
+    function patchVnode(oldVnode, vnode) {
+      if (oldVnode === vnode) {
+        return;
+      }
+
+      const elm = vnode.elm = oldVnode.elm;
+
+      invokeUpdateHooks(oldVnode, vnode);
+
+      const oldChildren = oldVnode.data.children;
+      const children = vnode.data.children;
+
+      updateChildren(elm, oldChildren, children);
+    }
+
+    function updateChildren(elm, oldChildren, children) {
+      for (let i = 0, l = children.length; i < l; i++){
+        patchVnode(oldChildren[i], children[i]);
+      }
+      for (let i = children.length, l = oldChildren.length; i < l; i++) {
+        patchVnode(oldChildren[i], children[i]);
+      }
+    }
+
+    return function patch (oldVnode, vnode, contextParent) {
+      let parentElm = contextParent;
+      if (!vnode) {
+        if (oldVnode) {
+          parentElm = nodeOps.parentNode(oldVnode);
+          nodeOps.removeChild(parentElm, oldVnode.elm);
+        }
+      }
+
+      if (!oldVnode) {
+        createElm(vnode, contextParent);
+      }
+
       const isRealElement = !!oldVnode.nodeType;
       if (isRealElement) {
-        const parentElm = nodeOps.parentNode(oldVnode);
+        parentElm = nodeOps.parentNode(oldVnode);
         createElm(vnode, parentElm, nodeOps.nextSibling(oldVnode));
+        nodeOps.removeChild(parentElm, oldVnode);
+      } else if (!isRealElement && vnode.type === oldVnode.type) {
+        patchVnode(oldVnode, vnode);
       }
     };
   }

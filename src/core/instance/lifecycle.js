@@ -3,7 +3,7 @@ import Watcher from '../observer/watcher';
 export default function (Vue) {
   Vue.prototype._update = function (vnode) {
     const prevVnode = this._vnode;
-    this._vnode = prevVnode;
+    this._vnode = vnode;
     if (prevVnode) {
       this.__patch__(prevVnode, vnode);
     } else {
