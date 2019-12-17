@@ -169,7 +169,13 @@
 
   function stateMixin (Vue) {
     Vue.prototype._initProps = function () {
-      
+      const propsOptions = this.$options.props || [];
+      const propsData = this.$options.propsData;
+      let propKey;
+      for (let i = 0, l = propsOptions.length; i < l; i++) {
+        propKey = propsOptions[i];
+        defineReactive(this, propKey, propsData[propKey]);
+      }
     };
 
     Vue.prototype._initState = function () {
@@ -254,11 +260,10 @@
       const prevVnode = this._vnode;
       this._vnode = vnode;
       if (prevVnode) {
-        this.__patch__(prevVnode, vnode);
+        this.$el = this.__patch__(prevVnode, vnode);
       } else {
-        this.__patch__(this.$el, vnode);
+        this.$el = this.__patch__(this.$el, vnode);
       }
-      
     };
   }
 
@@ -269,7 +274,7 @@
 
     new Watcher(vm, updateComponent);
 
-    return vm;
+    return vm.$el;
   }
 
   const TEXT_ELEMENT = 'TEXT ELEMENT';
@@ -280,7 +285,35 @@
     const rawChildren = hasChildren ? [].concat(...args) : [];
     data.children = rawChildren;
 
+    if (this) {
+      // context exists
+      const regComponents = this.$options.components || {};
+      if (regComponents.hasOwnProperty(type)) {
+        return createComponent(regComponents[type], data, this);
+      }
+    }
+    
     return { type, data, context: this };
+  }
+
+  function createComponent(Ctor, data, context) {
+    const propsData = {};
+    const propsOptions = Ctor.options.props || [];
+    const { attrs = {} } = data;
+    let propKey;
+    for (let i = 0, l = propsOptions.length; i < l; i++) {
+      propKey = propsOptions[i];
+      if (attrs.hasOwnProperty(propKey)) {
+        propsData[propKey] = attrs[propKey];
+      } else {
+        propsData[propKey] = '';
+      }
+    }
+
+    return {
+      type: Ctor,
+      data: Object.assign({}, data, { propsData, parent: context }),
+    }
   }
 
   function createTextElement(value) {
@@ -318,13 +351,17 @@
       return components[id];
     };
 
-    Vue.extend = function (extendOptions) {
-      return class extends Vue {
+    Vue.extend = function (extendOptions = {}) {
+      const cls = class extends Vue {
         constructor(options) {
           options = Object.assign({}, options, extendOptions);
           super(options);
         }
-      }
+      };
+
+      cls.options = extendOptions;
+
+      return cls;
     };
   }
 
@@ -335,6 +372,7 @@
 
     init(options) {
       this.$options = options;
+      this.$parent = options.parent;
 
       for (let k in options.methods) {
         this[k] = options.methods[k];
@@ -372,9 +410,6 @@
 
     if (tagMatch) {
       result.name = tagMatch[1];
-      if (components.hasOwnProperty(tagMatch[1])) {
-        result.type = components[tagMatch[1]];
-      }
     }
 
     let attrRegResult;
@@ -419,7 +454,7 @@
         level --;
       } else {
         level ++;
-        current = tagParser(tag, registeredComp);
+        current = tagParser(tag);
 
         if (nextChar && nextChar !== '<') {
           current.children.push({
@@ -488,6 +523,12 @@
             value: `_s(${value})`,
           });
         }
+        if (regResult[1] === 'bind') {
+          attrs.push({
+            name: `${regResult[2]}`,
+            value,
+          });
+        }
       } else {
         attrs.push({
           name,
@@ -538,16 +579,18 @@
 
     function createElm(vnode, parentElm, refElm) {
       const { type, data } = vnode;
-      if (type === TEXT_ELEMENT) {
+      if (typeof type === 'function') {
+        vnode.componentInstance = new type({ ...data });
+        vnode.elm = vnode.componentInstance.$mount();
+      } else if (type === TEXT_ELEMENT) {
         vnode.elm = nodeOps.createTextNode(data.value);
-        insert(parentElm, vnode.elm, refElm);
       } else {
         const { children } = data;
         vnode.elm = nodeOps.createElement(type);
         createChildren(vnode, children);
-        invokeCreateHooks(vnode);    
-        insert(parentElm, vnode.elm, refElm);
+        invokeCreateHooks(vnode);
       }
+      insert(parentElm, vnode.elm, refElm);
     }
 
     function createChildren(vnode, children) {
@@ -582,6 +625,10 @@
       }
 
       const elm = vnode.elm = oldVnode.elm;
+      
+      if (oldVnode.componentInstance) {
+        vnode.componentInstance = updateChildComponent(oldVnode.componentInstance, vnode.data);
+      }
 
       invokeUpdateHooks(oldVnode, vnode);
 
@@ -589,6 +636,15 @@
       const children = vnode.data.children;
 
       updateChildren(elm, oldChildren, children);
+    }
+
+    function updateChildComponent(componentInstance, options) {
+      const { propsData } = options;
+      for (let key in propsData) {
+        componentInstance[key] = propsData[key];
+      }
+
+      return componentInstance;
     }
 
     function updateChildren(elm, oldChildren, children) {
@@ -607,20 +663,23 @@
           parentElm = nodeOps.parentNode(oldVnode);
           nodeOps.removeChild(parentElm, oldVnode.elm);
         }
+        return;
       }
 
       if (!oldVnode) {
-        createElm(vnode, contextParent);
+        createElm(vnode, contextParent || this.$parent.$el);
+      } else {
+        const isRealElement = !!oldVnode.nodeType;
+        if (isRealElement) {
+          parentElm = nodeOps.parentNode(oldVnode);
+          createElm(vnode, parentElm, nodeOps.nextSibling(oldVnode));
+          nodeOps.removeChild(parentElm, oldVnode);
+        } else if (!isRealElement && vnode.type === oldVnode.type) {
+          patchVnode(oldVnode, vnode);
+        }
       }
 
-      const isRealElement = !!oldVnode.nodeType;
-      if (isRealElement) {
-        parentElm = nodeOps.parentNode(oldVnode);
-        createElm(vnode, parentElm, nodeOps.nextSibling(oldVnode));
-        nodeOps.removeChild(parentElm, oldVnode);
-      } else if (!isRealElement && vnode.type === oldVnode.type) {
-        patchVnode(oldVnode, vnode);
-      }
+      return vnode.elm;
     };
   }
 
@@ -764,7 +823,7 @@
       options.render = compileToFunction(template, options);
     }
 
-    return mountComponent(this, this.$el);
+    return mountComponent(this);
   };
 
   return Vue;

@@ -1,10 +1,17 @@
 import observe from '../observer/observe';
 import Watcher from '../observer/watcher';
 import Dep from '../observer/dep';
+import { defineReactive } from '../observer/observe';
 
 export default function (Vue) {
   Vue.prototype._initProps = function () {
-    
+    const propsOptions = this.$options.props || [];
+    const propsData = this.$options.propsData;
+    let propKey;
+    for (let i = 0, l = propsOptions.length; i < l; i++) {
+      propKey = propsOptions[i];
+      defineReactive(this, propKey, propsData[propKey]);
+    }
   }
 
   Vue.prototype._initState = function () {

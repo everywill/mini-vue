@@ -11,6 +11,7 @@ export default class Vue {
 
   init(options) {
     this.$options = options;
+    this.$parent = options.parent;
 
     for (let k in options.methods) {
       this[k] = options.methods[k];

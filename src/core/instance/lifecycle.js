@@ -5,11 +5,10 @@ export default function (Vue) {
     const prevVnode = this._vnode;
     this._vnode = vnode;
     if (prevVnode) {
-      this.__patch__(prevVnode, vnode);
+      this.$el = this.__patch__(prevVnode, vnode);
     } else {
-      this.__patch__(this.$el, vnode);
+      this.$el = this.__patch__(this.$el, vnode);
     }
-    
   }
 }
 
@@ -20,5 +19,5 @@ export function mountComponent(vm, el) {
 
   new Watcher(vm, updateComponent);
 
-  return vm;
+  return vm.$el;
 }

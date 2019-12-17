@@ -17,16 +17,18 @@ export default function createPatch ({nodeOps, modules}) {
 
   function createElm(vnode, parentElm, refElm) {
     const { type, data } = vnode;
-    if (type === TEXT_ELEMENT) {
+    if (typeof type === 'function') {
+      vnode.componentInstance = new type({ ...data });
+      vnode.elm = vnode.componentInstance.$mount();
+    } else if (type === TEXT_ELEMENT) {
       vnode.elm = nodeOps.createTextNode(data.value);
-      insert(parentElm, vnode.elm, refElm);
     } else {
       const { children } = data;
       vnode.elm = nodeOps.createElement(type);
       createChildren(vnode, children);
-      invokeCreateHooks(vnode);    
-      insert(parentElm, vnode.elm, refElm);
+      invokeCreateHooks(vnode);
     }
+    insert(parentElm, vnode.elm, refElm);
   }
 
   function createChildren(vnode, children) {
@@ -61,6 +63,10 @@ export default function createPatch ({nodeOps, modules}) {
     }
 
     const elm = vnode.elm = oldVnode.elm;
+    
+    if (oldVnode.componentInstance) {
+      vnode.componentInstance = updateChildComponent(oldVnode.componentInstance, vnode.data);
+    }
 
     invokeUpdateHooks(oldVnode, vnode);
 
@@ -68,6 +74,15 @@ export default function createPatch ({nodeOps, modules}) {
     const children = vnode.data.children;
 
     updateChildren(elm, oldChildren, children);
+  }
+
+  function updateChildComponent(componentInstance, options) {
+    const { propsData } = options;
+    for (let key in propsData) {
+      componentInstance[key] = propsData[key];
+    }
+
+    return componentInstance;
   }
 
   function updateChildren(elm, oldChildren, children) {
@@ -86,19 +101,22 @@ export default function createPatch ({nodeOps, modules}) {
         parentElm = nodeOps.parentNode(oldVnode);
         nodeOps.removeChild(parentElm, oldVnode.elm);
       }
+      return;
     }
 
     if (!oldVnode) {
-      createElm(vnode, contextParent);
+      createElm(vnode, contextParent || this.$parent.$el);
+    } else {
+      const isRealElement = !!oldVnode.nodeType;
+      if (isRealElement) {
+        parentElm = nodeOps.parentNode(oldVnode);
+        createElm(vnode, parentElm, nodeOps.nextSibling(oldVnode));
+        nodeOps.removeChild(parentElm, oldVnode);
+      } else if (!isRealElement && vnode.type === oldVnode.type) {
+        patchVnode(oldVnode, vnode);
+      }
     }
 
-    const isRealElement = !!oldVnode.nodeType;
-    if (isRealElement) {
-      parentElm = nodeOps.parentNode(oldVnode);
-      createElm(vnode, parentElm, nodeOps.nextSibling(oldVnode));
-      nodeOps.removeChild(parentElm, oldVnode);
-    } else if (!isRealElement && vnode.type === oldVnode.type) {
-      patchVnode(oldVnode, vnode);
-    }
+    return vnode.elm;
   };
 }

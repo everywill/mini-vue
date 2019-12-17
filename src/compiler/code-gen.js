@@ -42,6 +42,12 @@ function genConfig(element) {
           value: `_s(${value})`,
         });
       }
+      if (regResult[1] === 'bind') {
+        attrs.push({
+          name: `${regResult[2]}`,
+          value,
+        });
+      }
     } else {
       attrs.push({
         name,

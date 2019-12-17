@@ -23,7 +23,7 @@ Vue.prototype.$mount = function (el) {
     options.render = compileToFunction(template, options);
   }
 
-  return mountComponent(this, this.$el);
+  return mountComponent(this);
 }
 
 export default Vue;

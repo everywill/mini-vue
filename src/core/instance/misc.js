@@ -14,7 +14,7 @@ export default function (Vue) {
     return components[id];
   }
 
-  Vue.extend = function (extendOptions) {
+  Vue.extend = function (extendOptions = {}) {
     const cls = class extends Vue {
       constructor(options) {
         options = Object.assign({}, options, extendOptions);
