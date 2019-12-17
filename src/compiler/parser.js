@@ -1,6 +1,6 @@
 import tagParser from './tag-parser';
 
-const domParserTokenizer = /<[a-zA-Z\-\!\/](?:"[^"]*"['"]*|'[^']*'['"]*|[^'">])*>/gm;
+const domParserTokenizer = /<[a-zA-Z\-\!\/](?:"[^"]*"['"]*|'[^']*'['"]*|[^'">])*>/g;
 
 export default function parse(htmlString, options = {}) {
   const registeredComp = options.components || {};
@@ -19,7 +19,7 @@ export default function parse(htmlString, options = {}) {
       level --;
     } else {
       level ++;
-      current = tagParser(tag);
+      current = tagParser(tag, registeredComp);
 
       if (nextChar && nextChar !== '<') {
         current.children.push({
@@ -39,7 +39,6 @@ export default function parse(htmlString, options = {}) {
 
       levelParent[level] = current;
     }
-
   })
   
   return result;

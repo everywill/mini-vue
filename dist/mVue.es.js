@@ -354,7 +354,7 @@ renderMixin(Vue);
 
 const attrReg = /\s([^'"/\s><]+?)[\s/>]|([^\s=]+)=\s?(".*?"|'.*?')/g;
 
-function tagParser(tag) {
+function tagParser(tag, components) {
   const result = {
     type: 'tag',
     name: '',
@@ -366,6 +366,9 @@ function tagParser(tag) {
 
   if (tagMatch) {
     result.name = tagMatch[1];
+    if (components.hasOwnProperty(tagMatch[1])) {
+      result.type = components[tagMatch[1]];
+    }
   }
 
   let attrRegResult;
@@ -391,7 +394,7 @@ function tagParser(tag) {
   return result;
 }
 
-const domParserTokenizer = /<[a-zA-Z\-\!\/](?:"[^"]*"['"]*|'[^']*'['"]*|[^'">])*>/gm;
+const domParserTokenizer = /<[a-zA-Z\-\!\/](?:"[^"]*"['"]*|'[^']*'['"]*|[^'">])*>/g;
 
 function parse(htmlString, options = {}) {
   const registeredComp = options.components || {};
@@ -410,7 +413,7 @@ function parse(htmlString, options = {}) {
       level --;
     } else {
       level ++;
-      current = tagParser(tag);
+      current = tagParser(tag, registeredComp);
 
       if (nextChar && nextChar !== '<') {
         current.children.push({
@@ -430,7 +433,6 @@ function parse(htmlString, options = {}) {
 
       levelParent[level] = current;
     }
-
   });
   
   return result;
@@ -446,7 +448,6 @@ function genElement(element) {
   } else if (element.type === 'text') {
     return `_v('${element.content}')`;
   }
-  
 }
 
 function genType(element) {
@@ -509,8 +510,8 @@ function genChildren(element) {
   return children.map(child => genElement(child)).join(',');
 }
 
-function compileToFunction (htmlString) {
-  const elements = parse(htmlString);
+function compileToFunction (htmlString, options) {
+  const elements = parse(htmlString, options);
   return genCode(elements[0]);
 }
 
@@ -754,7 +755,7 @@ Vue.prototype.$mount = function (el) {
       template = el.outerHTML;
     }
 
-    options.render = compileToFunction(template);
+    options.render = compileToFunction(template, options);
   }
 
   return mountComponent(this, this.$el);

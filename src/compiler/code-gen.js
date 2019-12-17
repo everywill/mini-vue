@@ -8,7 +8,6 @@ function genElement(element) {
   } else if (element.type === 'text') {
     return `_v('${element.content}')`;
   }
-  
 }
 
 function genType(element) {

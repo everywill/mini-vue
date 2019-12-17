@@ -20,7 +20,7 @@ Vue.prototype.$mount = function (el) {
       template = el.outerHTML;
     }
 
-    options.render = compileToFunction(template);
+    options.render = compileToFunction(template, options);
   }
 
   return mountComponent(this, this.$el);

@@ -360,7 +360,7 @@
 
   const attrReg = /\s([^'"/\s><]+?)[\s/>]|([^\s=]+)=\s?(".*?"|'.*?')/g;
 
-  function tagParser(tag) {
+  function tagParser(tag, components) {
     const result = {
       type: 'tag',
       name: '',
@@ -372,6 +372,9 @@
 
     if (tagMatch) {
       result.name = tagMatch[1];
+      if (components.hasOwnProperty(tagMatch[1])) {
+        result.type = components[tagMatch[1]];
+      }
     }
 
     let attrRegResult;
@@ -397,7 +400,7 @@
     return result;
   }
 
-  const domParserTokenizer = /<[a-zA-Z\-\!\/](?:"[^"]*"['"]*|'[^']*'['"]*|[^'">])*>/gm;
+  const domParserTokenizer = /<[a-zA-Z\-\!\/](?:"[^"]*"['"]*|'[^']*'['"]*|[^'">])*>/g;
 
   function parse(htmlString, options = {}) {
     const registeredComp = options.components || {};
@@ -416,7 +419,7 @@
         level --;
       } else {
         level ++;
-        current = tagParser(tag);
+        current = tagParser(tag, registeredComp);
 
         if (nextChar && nextChar !== '<') {
           current.children.push({
@@ -436,7 +439,6 @@
 
         levelParent[level] = current;
       }
-
     });
     
     return result;
@@ -452,7 +454,6 @@
     } else if (element.type === 'text') {
       return `_v('${element.content}')`;
     }
-    
   }
 
   function genType(element) {
@@ -515,8 +516,8 @@
     return children.map(child => genElement(child)).join(',');
   }
 
-  function compileToFunction (htmlString) {
-    const elements = parse(htmlString);
+  function compileToFunction (htmlString, options) {
+    const elements = parse(htmlString, options);
     return genCode(elements[0]);
   }
 
@@ -760,7 +761,7 @@
         template = el.outerHTML;
       }
 
-      options.render = compileToFunction(template);
+      options.render = compileToFunction(template, options);
     }
 
     return mountComponent(this, this.$el);

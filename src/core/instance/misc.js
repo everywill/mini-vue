@@ -15,11 +15,15 @@ export default function (Vue) {
   }
 
   Vue.extend = function (extendOptions) {
-    return class extends Vue {
+    const cls = class extends Vue {
       constructor(options) {
         options = Object.assign({}, options, extendOptions);
         super(options);
       }
     }
+
+    cls.options = extendOptions;
+
+    return cls;
   }
 };

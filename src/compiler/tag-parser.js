@@ -1,6 +1,6 @@
 const attrReg = /\s([^'"/\s><]+?)[\s/>]|([^\s=]+)=\s?(".*?"|'.*?')/g;
 
-export default function tagParser(tag) {
+export default function tagParser(tag, components) {
   const result = {
     type: 'tag',
     name: '',

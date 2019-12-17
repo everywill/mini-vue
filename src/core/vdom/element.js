@@ -6,7 +6,16 @@ export function createElement(type, config, ...args) {
   const rawChildren = hasChildren ? [].concat(...args) : [];
   data.children = rawChildren;
 
+  const regComponents = this.$options.components || {};
+  if (regComponents.hasOwnProperty(type)) {
+    return createComponent(regComponents[type], data, context);
+  }
+
   return { type, data, context: this };
+}
+
+function createComponent(Ctor, data, context) {
+  
 }
 
 export function createTextElement(value) {
