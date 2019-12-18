@@ -245,8 +245,12 @@
   };
 
   function compileAndLinkProps(vm, el, props) {
+    const originalDirs = vm._directives.slice();
     const propsLinkFn = compileProps(el, props);
     propsLinkFn && propsLinkFn(vm);
+
+    vm._directives.slice(originalDirs.length).forEach(d => d._bind());
+    vm._directives = originalDirs;
   }
 
   function compileProps(el, optionProps, vm) {
@@ -256,7 +260,7 @@
     let name, path;
     while(i--) {
       name = names[i];
-      path = el.getAttribute(`:${name}`);
+      path = el.getAttribute(`v-bind:${name}`) || el.getAttribute(`:${name}`);
       props.push({
         name,
         path
